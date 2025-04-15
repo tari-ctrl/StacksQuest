@@ -108,3 +108,68 @@
         (ok true)
     )
 )
+
+;; Complete dungeon challenge and claim reward
+(define-public (complete-dungeon (token <token-trait>) (player principal))
+    (let
+        (
+            (current-block u8000)
+            (player-stats (default-to 
+                {
+                    last-dungeon-block: u0, 
+                    total-dungeons-completed: u0, 
+                    total-rewards-earned: u0
+                } 
+                (map-get? player-dungeon-stats { player: player })
+            ))
+        )
+        ;; Check authorization
+        (asserts! (is-eq tx-sender player) ERR-UNAUTHORIZED)
+
+        ;; Verify token contract
+        (asserts! (is-valid-token token) ERR-INVALID-TOKEN)
+
+        ;; Transfer reward
+        (try! (as-contract 
+            (contract-call? token transfer
+                tx-sender
+                player
+                REWARD_AMOUNT)))
+
+        ;; Update player dungeon stats
+        (map-set player-dungeon-stats 
+            { player: player }
+            {
+                last-dungeon-block: current-block,
+                total-dungeons-completed: (+ (get total-dungeons-completed player-stats) u1),
+                total-rewards-earned: (+ (get total-rewards-earned player-stats) REWARD_AMOUNT)
+            }
+        )
+
+        (ok true)
+    )
+)
+
+;; READ-ONLY FUNCTIONS
+;; Retrieve player's dungeon statistics
+(define-read-only (get-player-dungeon-stats (player principal))
+    (ok (default-to 
+        {
+            last-dungeon-block: u0, 
+            total-dungeons-completed: u0, 
+            total-rewards-earned: u0
+        }
+        (map-get? player-dungeon-stats { player: player })
+    ))
+)
+
+;; ADMINISTRATIVE FUNCTIONS
+;; Update the allowed token for the dungeon
+(define-public (set-allowed-token (new-token principal))
+    (begin
+        (asserts! (is-contract-owner) ERR-NOT-CONTRACT-OWNER)
+        (asserts! (not (is-eq new-token (var-get allowed-token))) ERR-INVALID-PRINCIPAL)
+        (var-set allowed-token new-token)
+        (ok true)
+    )
+)
