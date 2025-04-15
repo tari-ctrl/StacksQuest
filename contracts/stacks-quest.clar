@@ -173,3 +173,34 @@
         (ok true)
     )
 )
+
+;; OWNERSHIP MANAGEMENT
+;; Initiate two-step ownership transfer
+(define-public (initiate-contract-ownership-transfer (new-owner principal))
+    (begin
+        (asserts! (is-contract-owner) ERR-NOT-CONTRACT-OWNER)
+        (asserts! (is-valid-principal new-owner) ERR-INVALID-PRINCIPAL)
+        (var-set pending-owner (some new-owner))
+        (ok true)
+    )
+)
+
+;; Accept pending ownership transfer
+(define-public (accept-contract-ownership)
+    (let 
+        ((pending (unwrap! (var-get pending-owner) ERR-PENDING-OWNER-ONLY)))
+        (asserts! (is-eq tx-sender pending) ERR-UNAUTHORIZED)
+        (var-set contract-owner pending)
+        (var-set pending-owner none)
+        (ok true)
+    )
+)
+
+;; Cancel pending ownership transfer
+(define-public (cancel-contract-ownership-transfer)
+    (begin
+        (asserts! (is-contract-owner) ERR-NOT-CONTRACT-OWNER)
+        (var-set pending-owner none)
+        (ok true)
+    )
+)
