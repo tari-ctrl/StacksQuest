@@ -64,3 +64,47 @@
         (not (is-eq address (as-contract tx-sender)))
     )
 )
+
+;; PUBLIC FUNCTIONS
+;; Enter the dungeon with cooldown check
+(define-public (enter-dungeon (token <token-trait>) (player principal))
+    (let 
+        (
+            (player-balance (unwrap! (contract-call? token get-balance player) ERR-INSUFFICIENT-BALANCE))
+            (current-block u8000)
+            (player-stats (default-to 
+                {
+                    last-dungeon-block: u0, 
+                    total-dungeons-completed: u0, 
+                    total-rewards-earned: u0
+                } 
+                (map-get? player-dungeon-stats { player: player })
+            ))
+        )
+        ;; Check authorization
+        (asserts! (is-eq tx-sender player) ERR-UNAUTHORIZED)
+
+        ;; Verify token contract
+        (asserts! (is-valid-token token) ERR-INVALID-TOKEN)
+
+        ;; Check cooldown
+        (asserts! 
+            (>= current-block 
+                (+ (get last-dungeon-block player-stats) DUNGEON_COOLDOWN_BLOCKS)
+            ) 
+            ERR-DUNGEON-COOLDOWN
+        )
+
+        ;; Update player dungeon stats
+        (map-set player-dungeon-stats 
+            { player: player }
+            {
+                last-dungeon-block: current-block,
+                total-dungeons-completed: (get total-dungeons-completed player-stats),
+                total-rewards-earned: (get total-rewards-earned player-stats)
+            }
+        )
+
+        (ok true)
+    )
+)
